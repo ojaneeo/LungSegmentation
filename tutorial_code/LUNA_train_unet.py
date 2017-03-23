@@ -8,7 +8,7 @@ from keras.optimizers import SGD
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 from keras import backend as K
 
-working_path = "/home/jonathan/tutorial/"
+working_path = "/Volumes/G-DRIVE mobile/LUNAData/output/"
 
 K.set_image_dim_ordering('th')  # Theano dimension ordering in this code
 
@@ -17,7 +17,7 @@ img_cols = 512
 
 smooth = 1.
 
-
+# Tensorflow version for the model
 def dice_coef(y_true, y_pred):
     y_true_f = K.flatten(y_true)
     y_pred_f = K.flatten(y_pred)
@@ -119,6 +119,7 @@ def train_and_predict(use_existing):
     print('-'*30)
     print('Fitting model...')
     print('-'*30)
+    # This is where the training happens
     model.fit(imgs_train, imgs_mask_train, batch_size=2, nb_epoch=20, verbose=1, shuffle=True,
               callbacks=[model_checkpoint])
 
@@ -143,4 +144,4 @@ def train_and_predict(use_existing):
     print("Mean Dice Coeff : ",mean)
 
 if __name__ == '__main__':
-    train_and_predict(False)
+    train_and_predict(False) #change this to true for running the dicom files through

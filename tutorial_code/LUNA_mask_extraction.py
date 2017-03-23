@@ -4,6 +4,7 @@ import numpy as np
 import csv
 from glob import glob
 import pandas as pd
+import os
 try:
     from tqdm import tqdm # long waits are not fun
 except:
@@ -16,7 +17,7 @@ def make_mask(center,diam,z,width,height,spacing,origin):
     '''
 Center : centers of circles px -- list of coordinates x,y,z
 diam : diameters of circles px -- diameter
-widthXheight : pixel dim of image
+widthXheight : pixel dimension of image
 spacing = mm/px conversion rate np array x,y,z
 origin = x,y,z mm np.array
 z = z position of slice in world coordinates mm
@@ -48,22 +49,23 @@ z = z position of slice in world coordinates mm
                 mask[int((p_y-origin[1])/spacing[1]),int((p_x-origin[0])/spacing[0])] = 1.0
     return(mask)
 
-def matrix2int16(matrix):
-    ''' 
-matrix must be a numpy array NXN
-Returns uint16 version
-    '''
-    m_min= np.min(matrix)
-    m_max= np.max(matrix)
-    matrix = matrix-m_min
-    return(np.array(np.rint( (matrix-m_min)/float(m_max-m_min) * 65535.0),dtype=np.uint16))
+# def matrix2int16(matrix):
+#     '''
+# matrix must be a numpy array NXN
+# Returns uint16 version
+#     '''
+#     m_min= np.min(matrix)
+#     m_max= np.max(matrix)
+#     matrix = matrix-m_min
+#     return(np.array(np.rint( (matrix-m_min)/float(m_max-m_min) * 65535.0),dtype=np.uint16))
 
 ############
 #
 # Getting list of image files
-luna_path = "/home/jonathan/LUNA2016/"
-luna_subset_path = luna_path+"subset1/"
-output_path = "/home/jonathan/tutorial/"
+luna_path = "/Volumes/G-DRIVE mobile/LUNAData/" #May have to change filepath to deal with the name of the harddrive
+luna_subset_path = luna_path+"testsubset/"
+annotations_path = luna_path+"CSVFILES/"
+output_path = "/Volumes/G-DRIVE mobile/LUNAData/output/"
 file_list=glob(luna_subset_path+"*.mhd")
 
 
@@ -77,7 +79,7 @@ def get_filename(file_list, case):
             return(f)
 #
 # The locations of the nodes
-df_node = pd.read_csv(luna_path+"annotations.csv")
+df_node = pd.read_csv(annotations_path+"annotations.csv")
 df_node["file"] = df_node["seriesuid"].map(lambda file_name: get_filename(file_list, file_name))
 df_node = df_node.dropna()
 
@@ -89,8 +91,8 @@ for fcount, img_file in enumerate(tqdm(file_list)):
     mini_df = df_node[df_node["file"]==img_file] #get all nodules associate with file
     if mini_df.shape[0]>0: # some files may not have a nodule--skipping those 
         # load the data once
-        itk_img = sitk.ReadImage(img_file) 
-        img_array = sitk.GetArrayFromImage(itk_img) # indexes are z,y,x (notice the ordering)
+        itk_img = sitk.ReadImage(img_file)      # This is a sitk Image object (can read DICOM file just as easily)
+        img_array = sitk.GetArrayFromImage(itk_img) # indexes are z,y,x (notice the ordering) **gets a numpy array from the image**
         num_z, height, width = img_array.shape        #heightXwidth constitute the transverse plane
         origin = np.array(itk_img.GetOrigin())      # x,y,z  Origin in world coordinates (mm)
         spacing = np.array(itk_img.GetSpacing())    # spacing of voxels in world coor. (mm)
@@ -100,12 +102,12 @@ for fcount, img_file in enumerate(tqdm(file_list)):
             node_y = cur_row["coordY"]
             node_z = cur_row["coordZ"]
             diam = cur_row["diameter_mm"]
-            # just keep 3 slices
-            imgs = np.ndarray([3,height,width],dtype=np.float32)
+            # just keep 3 slices (maybe test changing this number later)
+            imgs = np.ndarray([3,height,width],dtype=np.float32) # depth, height, width
             masks = np.ndarray([3,height,width],dtype=np.uint8)
             center = np.array([node_x, node_y, node_z])   # nodule center
             v_center = np.rint((center-origin)/spacing)  # nodule center in voxel space (still x,y,z ordering)
-            for i, i_z in enumerate(np.arange(int(v_center[2])-1,
+            for i, i_z in enumerate(np.arange(int(v_center[2])-1, # This returns evenly spaced slices in this interval # i is the index for the i_z slice
                              int(v_center[2])+2).clip(0, num_z-1)): # clip prevents going out of bounds in Z
                 mask = make_mask(center, diam, i_z*spacing[2]+origin[2],
                                  width, height, spacing, origin)
@@ -113,3 +115,18 @@ for fcount, img_file in enumerate(tqdm(file_list)):
                 imgs[i] = img_array[i_z]
             np.save(os.path.join(output_path,"images_%04d_%04d.npy" % (fcount, node_idx)),imgs)
             np.save(os.path.join(output_path,"masks_%04d_%04d.npy" % (fcount, node_idx)),masks)
+
+
+# For viewing .npy
+import matplotlib.pyplot as plt
+imgs = np.load(output_path+'images_0000_0025.npy')
+masks = np.load(output_path+'masks_0000_0025.npy')
+for i in range(len(imgs)):
+    print ("image %d" % i)
+    print (len(imgs))
+    fig,ax = plt.subplots(2,2,figsize=[8,8])
+    ax[0,0].imshow(imgs[i],cmap='gray')
+    ax[0,1].imshow(masks[i],cmap='gray')
+    ax[1,0].imshow(imgs[i]*masks[i],cmap='gray')
+    plt.show()
+    raw_input("hit enter to cont : ")

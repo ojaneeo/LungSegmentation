@@ -5,18 +5,18 @@ from sklearn.cluster import KMeans
 from skimage.transform import resize
 from glob import glob
 
-working_path = "/home/jonathan/tutorial/"
+working_path = "/Volumes/G-DRIVE mobile/LUNAData/output/"
 file_list=glob(working_path+"images_*.npy")
 
 for img_file in file_list:
     # I ran into an error when using Kmean on np.float16, so I'm using np.float64 here
-    imgs_to_process = np.load(img_file).astype(np.float64) 
+    imgs_to_process = np.load(img_file).astype(np.float64) # this is an array
     print "on image", img_file
-    for i in range(len(imgs_to_process)):
-        img = imgs_to_process[i]
+    for i in range(len(imgs_to_process)): # we assume len is the number of slices (3) i is a slice each image has 3 slices
+        img = imgs_to_process[i] # this is a single image slice, an array with heightXwidth
         #Standardize the pixel values
         mean = np.mean(img)
-        std = np.std(img)
+        std = np.std(img) #calculates the standard deviation along the specified axis (which is an array here??)
         img = img-mean
         img = img/std
         # Find the average pixel value near the lungs
@@ -36,6 +36,9 @@ for img_file in file_list:
         # the non-tissue parts of the image as much as possible
         #
         kmeans = KMeans(n_clusters=2).fit(np.reshape(middle,[np.prod(middle.shape),1]))
+            # prod gives you the product of the array elements
+            # reshape gives a new shape to the array without changing its data (so we turn the middle into a vector)
+            # fit computes the clustering on the given data
         centers = sorted(kmeans.cluster_centers_.flatten())
         threshold = np.mean(centers)
         thresh_img = np.where(img<threshold,1.0,0.0)  # threshold the image
@@ -50,7 +53,7 @@ for img_file in file_list:
         #
         #  Label each region and obtain the region properties
         #  The background region is removed by removing regions 
-        #  with a bbox that is to large in either dimnsion
+        #  with a bbox that is too large in either dimension
         #  Also, the lungs are generally far away from the top 
         #  and bottom of the image, so any regions that are too
         #  close to the top and bottom are removed
@@ -90,13 +93,13 @@ out_images = []      #final set of images
 out_nodemasks = []   #final set of nodemasks
 for fname in file_list:
     print "working on file ", fname
-    imgs_to_process = np.load(fname.replace("lungmask","images"))
+    imgs_to_process = np.load(fname.replace("lungmask","images")) #replace the WHOLE image with just the lungs masked out
     masks = np.load(fname)
-    node_masks = np.load(fname.replace("lungmask","masks"))
+    node_masks = np.load(fname.replace("lungmask","masks")) #replaes the node MASK with the masked out node
     for i in range(len(imgs_to_process)):
-        mask = masks[i]
-        node_mask = node_masks[i]
-        img = imgs_to_process[i]
+        mask = masks[i] # this is a slice of the lung mask
+        node_mask = node_masks[i] # this is a slice of the node mask
+        img = imgs_to_process[i] # this is a slice of the original image
         new_size = [512,512]   # we're scaling back up to the original size of the image
         img= mask*img          # apply lung mask
         #
@@ -144,7 +147,7 @@ for fname in file_list:
         # 
         img = img[min_row:max_row,min_col:max_col]
         mask =  mask[min_row:max_row,min_col:max_col]
-        if max_row-min_row <5 or max_col-min_col<5:  # skipping all images with no god regions
+        if max_row-min_row <5 or max_col-min_col<5:  # skipping all images with no good regions
             pass
         else:
             # moving range to -1 to 1 to accomodate the resize function
@@ -169,10 +172,26 @@ for i in range(num_images):
     final_masks[i,0] = out_nodemasks[i]
 
 rand_i = np.random.choice(range(num_images),size=num_images,replace=False)
-test_i = int(0.2*num_images)
+test_i = int(0.2*num_images) #Because we want to withhold 20% for testing, and train on the rest
 np.save(working_path+"trainImages.npy",final_images[rand_i[test_i:]])
-np.save(working_path+"trainMasks.npy",final_masks[rand_i[test_i:]])
+np.save(working_path+"trainMasks.npy",final_masks[rand_i[test_i:]]) #this is going to include the slices as separate images, rather than 3 slices per image
 np.save(working_path+"testImages.npy",final_images[rand_i[:test_i]])
-np.save(working_path+"testMasks.npy",final_masks[rand_i[:test_i]])
+np.save(working_path+"testMasks.npy",final_masks[rand_i[:test_i]]) #this is going to include the slices as separate images, rather than 3 slices per image
 
 
+# For checking the ROI isolating
+import matplotlib.pyplot as plt
+imgs = np.load(working_path+'images_0000_0025.npy')
+lungmask = np.load(working_path+'lungmask_0000_0025.npy')
+nodulemask = np.load(working_path+'trainImages.npy')
+print len(nodulemask)
+for i in range(len(imgs)):
+    if i == 0:
+        print "image %d" % i
+        fig,ax = plt.subplots(2,2,figsize=[8,8])
+        ax[0,0].imshow(imgs[i],cmap='gray')
+        ax[0,1].imshow(lungmask[i],cmap='gray')
+        ax[1,0].imshow(imgs[i]*lungmask[i],cmap='gray')
+        ax[1,1].imshow(nodulemask[i,0],cmap='gray')
+        plt.show()
+        #raw_input("hit enter to cont : ")

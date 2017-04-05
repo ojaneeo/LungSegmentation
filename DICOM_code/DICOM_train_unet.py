@@ -100,7 +100,7 @@ def predict_masks(patientImages):
     imgs_mask_test = np.ndarray([num_test, 1, 512, 512], dtype=np.float32)
     for i in range(num_test):
         imgs_mask_test[i] = model.predict([imgs_test[i:i + 1]], verbose=0)[0]
-    np.save(patientID+'_masks.npy', imgs_mask_test)
+    np.save(working_path + 'masks_%s.npy' % patientID, imgs_mask_test)
 
 
 if __name__ == '__main__':

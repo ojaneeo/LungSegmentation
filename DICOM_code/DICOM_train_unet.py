@@ -7,7 +7,7 @@ from keras.optimizers import Adam
 from keras import backend as K
 from glob import glob
 
-working_path = "/Volumes/G-DRIVE mobile/LUNAData/patients"
+working_path = "/Volumes/G-DRIVE mobile/KaggleData/output/"
 
 K.set_image_dim_ordering('th')  # Theano dimension ordering in this code
 
@@ -80,9 +80,10 @@ def predict_masks(patientImages):
     # testImages.npy is an array of ALL images to be tested, irrespective of patient.
     # coming in from Dicom, we're going to get an array of all images from ONE patient.
     # the patient ID will be the file name for the .npy
-    imgs_test = np.load(working_path + patientImages).astype(np.float32)
+    imgs_test = np.load(patientImages).astype(np.float32)
     patientID = patientImages.replace('.npy', '')
     patientID = patientID.replace('ROI_', '')
+    patientID = patientID.replace(working_path, "")
 
     model = get_unet()
 
